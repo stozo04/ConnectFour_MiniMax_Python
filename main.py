@@ -1,13 +1,15 @@
 import math
-import pygame
-import numpy as np
 import random
+import pygame
+import copy
+import numpy as np
 
 # GLOBAL VARIABLES
+
 ROWS = 6
 COLUMNS = 7
-CONNECT_X = 4
-SQUARE_SIZE = 100
+CONNECT_X = 4 # How many connected pieces win
+SQUARE_SIZE = 100 # Size of window and playing objects
 RADIUS = int(SQUARE_SIZE / 2 - 5)
 WIDTH = COLUMNS * SQUARE_SIZE
 HEIGHT = (ROWS + 1) * SQUARE_SIZE
@@ -18,233 +20,234 @@ BLACK = (0, 0, 0)
 RED = (255, 0, 0)
 YELLOW = (255, 255, 0)
 
-class ConnectFour:
-    def __init__(self):
-        try:
-            pygame.init()
-            self.board = self.createBoard()
-            self.gameOver = False
-            self.turn = 0
-            self.window = pygame.display.set_mode((COLUMNS * SQUARE_SIZE, (ROWS + 1) * SQUARE_SIZE))
-            self.myfont = pygame.font.SysFont("monospace", 75)
-        except pygame.error as e:
-            print(f"Error initializing Pygame: {e}")
-            raise SystemExit(e)
-    
-    def createBoard(self):
-        return np.zeros((ROWS, COLUMNS))
-    
-    def printBoard(self):
-        print(np.flip(self.board, 0))
-    
-    def drawBoard(self):
-        for c in range(COLUMNS):
-            for r in range(ROWS):
-                pygame.draw.rect(self.window, BLUE, (c * SQUARE_SIZE, r * SQUARE_SIZE + SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE))
-                pygame.draw.circle(self.window, BLACK, (int(c * SQUARE_SIZE + SQUARE_SIZE / 2), int(r * SQUARE_SIZE + SQUARE_SIZE + SQUARE_SIZE / 2)), RADIUS)
-        
-        for c in range(COLUMNS):
-            for r in range(ROWS):
-                if self.board[r][c] == 1:
-                    pygame.draw.circle(self.window, RED, (int(c * SQUARE_SIZE + SQUARE_SIZE / 2), HEIGHT-int(r * SQUARE_SIZE + SQUARE_SIZE / 2)), RADIUS)
-                elif self.board[r][c] == 2:
-                    pygame.draw.circle(self.window, YELLOW, (int(c * SQUARE_SIZE + SQUARE_SIZE / 2), HEIGHT-int(r * SQUARE_SIZE + SQUARE_SIZE / 2)), RADIUS)
-        
-        pygame.display.update()
 
-    def dropPiece(self, board, row, col, player):
-        board[row][col] = player
+window = pygame.display.set_mode((COLUMNS * SQUARE_SIZE, (ROWS + 1) * SQUARE_SIZE)) # + 1 is for the space to drop token
 
-    def isValidLocation(self, col):
-        if col < 0 or col >= COLUMNS:
-            return False
-        return self.board[ROWS - 1][col] == 0
+# FUNCTIONS
 
-    def getNextOpenRow(self, col):
+def printBoard(board):
+    print(np.flip(board, 0))
+
+def createBoard():
+    board = np.zeros((ROWS, COLUMNS))
+    return board
+
+def drawBoard(board):
+    for c in range(COLUMNS):
         for r in range(ROWS):
-            if self.board[r][col] == 0:
-                return r
+            # Board
+            pygame.draw.rect(window, BLUE, (c * SQUARE_SIZE, r * SQUARE_SIZE + SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE))
+            # Empty Space
+            pygame.draw.circle(window, BLACK, (int(c * SQUARE_SIZE + SQUARE_SIZE / 2), int(r * SQUARE_SIZE + SQUARE_SIZE + SQUARE_SIZE / 2)), RADIUS)
 
-    def winningMove(self, player):
-        # Check horizontal, vertical, and diagonal win conditions
-        for c in range(COLUMNS - 3):
-            for r in range(ROWS):
-                if self.board[r][c] == player and self.board[r][c + 1] == player and self.board[r][c + 2] == player and self.board[r][c + 3] == player:
-                    return True
-        
-        for c in range(COLUMNS):
-            for r in range(ROWS - 3):
-                if self.board[r][c] == player and self.board[r + 1][c] == player and self.board[r + 2][c] == player and self.board[r + 3][c] == player:
-                    return True
-
-        for c in range(COLUMNS - 3):
-            for r in range(ROWS - 3):
-                if self.board[r][c] == player and self.board[r + 1][c + 1] == player and self.board[r + 2][c + 2] == player and self.board[r + 3][c + 3] == player:
-                    return True
-
-        for c in range(COLUMNS - 3):
-            for r in range(3, ROWS):
-                if self.board[r][c] == player and self.board[r - 1][c + 1] == player and self.board[r - 2][c + 2] == player and self.board[r - 3][c + 3] == player:
-                    return True
-    
-    def handlePlayerMove(self, player, posx):
-        col = int(math.floor(posx / SQUARE_SIZE))
-        if not self.isValidLocation(col):
-            print(f"Invalid column: {col}. Try again.")
-            return False
-        row = self.getNextOpenRow(col)
-        self.dropPiece(self.board, row, col, player)
-
-        if self.winningMove(player):
-            label = self.myfont.render(f"Player {player} Wins!!", 1, RED if player == 1 else YELLOW)
-            self.window.blit(label, (40, 10))
-            self.gameOver = True
-        return True
-
-    def evaluateWindow(self, window, player):
-        score = 0
-        opponent = 1 if player == 2 else 2
-
-        if window.count(player) == 4:
-            score += 100
-        elif window.count(player) == 3 and window.count(0) == 1:
-            score += 5
-        elif window.count(player) == 2 and window.count(0) == 2:
-            score += 2
-
-        if window.count(opponent) == 3 and window.count(0) == 1:
-            score -= 4
-
-        return score
-
-    def scorePosition(self, board, player):
-        score = 0
-
-        # Score center column
-        center_array = [int(i) for i in list(board[:, COLUMNS // 2])]
-        center_count = center_array.count(player)
-        score += center_count * 3
-
-        # Score Horizontal
+    for c in range(COLUMNS):
         for r in range(ROWS):
-            row_array = [int(i) for i in list(board[r, :])]
-            for c in range(COLUMNS - 3):
-                window = row_array[c:c + 4]
-                score += self.evaluateWindow(window, player)
+            # Player 1
+            if board[r][c] == 1:
+                pygame.draw.circle(window, RED, (int(c * SQUARE_SIZE + SQUARE_SIZE / 2), HEIGHT-int(r * SQUARE_SIZE + SQUARE_SIZE / 2)), RADIUS)
+            # Player 2
+            elif board[r][c] == 2:
+                 pygame.draw.circle(window, YELLOW, (int(c * SQUARE_SIZE + SQUARE_SIZE / 2), HEIGHT-int(r * SQUARE_SIZE + SQUARE_SIZE / 2)), RADIUS)
 
-        # Score Vertical
-        for c in range(COLUMNS):
-            col_array = [int(i) for i in list(board[:, c])]
-            for r in range(ROWS - 3):
-                window = col_array[r:r + 4]
-                score += self.evaluateWindow(window, player)
+    pygame.display.update()
 
-        # Score positive sloped diagonal
+def dropPiece(board, row, col, player):
+    board[row][col] = player
+
+def isValidLoaction(board, col):
+    # Check if the top row contains 0 (means it is available)
+    return board[ROWS - 1][col] == 0
+
+def getNextOpenRow(board, col):
+       for r in range(ROWS):
+         if board[r][col] == 0:
+             return r
+
+def winningMove(board, player):
+     # Check horizontal for win
+    for c in range(COLUMNS - 3):
+        for r in range(ROWS):
+            if board[r][c] == player and board[r][c + 1] == player and board[r][c + 2] == player and board[r][c + 3] == player:
+                return True
+
+    # Check vertical for win
+    for c in range(COLUMNS):
         for r in range(ROWS - 3):
-            for c in range(COLUMNS - 3):
-                window = [board[r + i][c + i] for i in range(4)]
-                score += self.evaluateWindow(window, player)
+            if board[r][c] == player and board[r + 1][c] == player and board[r + 2][c] == player and board[r + 3][c] == player:
+                return True
 
-        # Score negative sloped diagonal
+    # Check right diagonal for win
+    for c in range(COLUMNS - 3):
         for r in range(ROWS - 3):
-            for c in range(COLUMNS - 3):
-                window = [board[r + 3 - i][c + i] for i in range(4)]
-                score += self.evaluateWindow(window, player)
+            if board[r][c] == player and board[r + 1][c + 1] == player and board[r + 2][c + 2] == player and board[r + 3][c + 3] == player:
+                return True
 
-        return score
+    # Check left diagonal for win
+    for c in range(COLUMNS - 3):
+        for r in range(3, ROWS):
+            if board[r][c] == player and board[r - 1][c + 1] == player and board[r - 2][c + 2] == player and board[r +- 3][c + 3] == player:
+                return True
 
-    def get_valid_locations(self, board):
-        valid_locations = []
+def restartGame(board):
+    board = np.zeros((ROWS, COLUMNS))
+    return board
+
+def isBoardFull(board):
+    for row in range(ROWS):
         for col in range(COLUMNS):
-            if self.isValidLocation(col):
-                valid_locations.append(col)
-        return valid_locations
+            if board[row][col] == 0:
+                return False
+    return True
 
-    def minimax(self, board, depth, alpha, beta, maximizingPlayer):
-        is_terminal = self.winningMove(1) or self.winningMove(2) or len(self.get_valid_locations(board)) == 0
-        if depth == 0 or is_terminal:
-            if is_terminal:
-                if self.winningMove(1):
-                    return (None, 100000000000000)
-                elif self.winningMove(2):
-                    return (None, -10000000000000)
-                else: # Game is over, no more valid moves
-                    return (None, 0)
-            else: # Depth is zero
-                return (None, self.scorePosition(board, 1))
-        
-        if maximizingPlayer:
-            value = -math.inf
-            column = random.choice(self.get_valid_locations(board))
-            for col in self.get_valid_locations(board):
-                row = self.getNextOpenRow(col)
-                b_copy = board.copy()
-                self.dropPiece(b_copy,row, col, 1)
-                new_score = self.minimax(b_copy, depth-1, alpha, beta, False)[1]
-                if new_score > value:
-                    value = new_score
-                    column = col
-                alpha = max(alpha, value)
-                if alpha >= beta:
-                    break
-            return column, value
+def getAvailableMoves(board):
+    moves = []
+    for c in range(COLUMNS):
+        row = getNextOpenRow(board, c)
+        if row is not None:  # Check if the column is not completely filled
+            if board[col][row] == 0:
+                moves.append((row, c))
 
-        else: # Minimizing player
-            value = math.inf
-            column = random.choice(self.get_valid_locations(board))
-            for col in self.get_valid_locations(board):
-                row = self.getNextOpenRow(col)
-                b_copy = board.copy()
-                self.dropPiece(b_copy, row, col, 2)
-                new_score = self.minimax(b_copy, depth-1, alpha, beta, True)[1]
-                if new_score < value:
-                    value = new_score
-                    column = col
-                beta = min(beta, value)
-                if alpha >= beta:
-                    break
-            return column, value
+    print("Available Moves: ", moves)
+    return moves
 
-    def runGame(self):
-        self.drawBoard()
+def miniMax(baordCopy, depth, isMaximizing):
+    if depth == 0:
+        return (None, 0)
+    if winningMove(baordCopy, 1):
+        return (None, -math.inf)
+    elif winningMove(baordCopy, 2):
+        return (None, math.inf)
+    elif isBoardFull(baordCopy): # That means there are no valid moves
+        return (None, 0)
+
+    if(isMaximizing): # Simulating AI Move (maximize)
+        bestScore = -math.inf
+        bestMove = (-1, -1)
+        for move in getAvailableMoves(baordCopy):
+            row, col = move  # Unpack the move tuple into row and col
+            # Apply the move to the game state
+            baordCopy[row][col] = 2
+            printBoard(baordCopy)
+            move, minimax_score = miniMax(baordCopy, depth - 1, False)
+            if minimax_score is not None and minimax_score > bestScore:
+                if move is None:
+                    availableMove = getAvailableMoves(baordCopy)
+                    bestMove = random.choice(availableMove)
+                else:
+                    bestMove = move
+            bestScore = minimax_score
+                
+        return bestMove, bestScore
+
+    else: # Human  Player
+        lowestScore = math.inf
+        worstMove = (-1, -1)
+        for move in getAvailableMoves(baordCopy):
+            row, col = move  # Unpack the move tuple into row and col
+            # Apply the move to the game state
+            baordCopy[row][col] = 1
+            printBoard(baordCopy)
+            move, minimax_score = miniMax(baordCopy, depth - 1, True)
+
+            if minimax_score is not None and minimax_score < lowestScore:
+                if move is None:
+                    availableMove = getAvailableMoves(baordCopy)
+                    worstMove = random.choice(availableMove)
+                else:
+                    worstMove = move
+                    
+            lowestScore = minimax_score
+
+        return worstMove, lowestScore
+
+# def bestMove(board, depth, isMaximizing):
+#     bestScore = -math.inf
+#     bestMove  = (-1, -1)
+#     boardCopy = board
+#     for move in getAvailableMoves(boardCopy):
+#         row, col = move  # Unpack the move tuple into row and col
+#          # Apply the move to the game state
+#         boardCopy[row][col] = 2
+#         score = miniMax(boardCopy, depth, isMaximizing)
+#         if score > bestScore:
+#             bestScore = score
+#             bestMove = move
+
+#     if bestMove != (-1, -1):
+#         row, col = move  # Unpack the move tuple into row and col
+#         board[row][col] = move
+#         return True
+#     return False
+
+board = createBoard()
+printBoard(board)
+gameOver = False
+player = 1
+pygame.init()
+size = (WIDTH, HEIGHT)
+screen = pygame.display.set_mode(size)
+drawBoard(board)
+pygame.display.update()
+
+myfont = pygame.font.SysFont("monospace", 75)
+
+while True:
+    for e in pygame.event.get():
+
+        # Check if user wants to quit
+        if e.type == pygame.QUIT: 
+            gameOver = True
+
+        if e.type == pygame.MOUSEMOTION:
+            pygame.draw.rect(window, BLACK, (0,0, WIDTH, SQUARE_SIZE))
+            posx = e.pos[0]
+            if player == 1:
+                pygame.draw.circle(window, RED, (posx, int(SQUARE_SIZE / 2)), RADIUS)
+            else:
+                pygame.draw.circle(window, YELLOW, (posx, int(SQUARE_SIZE / 2)), RADIUS)
         pygame.display.update()
 
-        while not self.gameOver:
-            if self.turn == 0:
-                for e in pygame.event.get():
-                    if e.type == pygame.QUIT:
-                        self.gameOver = True
+        if e.type == pygame.MOUSEBUTTONDOWN:
+            pygame.draw.rect(window, BLACK, (0,0, WIDTH, SQUARE_SIZE))
+           
+            # Grab location of user mouse click
+            posx = e.pos[0]
+            col = int(math.floor(posx / SQUARE_SIZE))
+            if isValidLoaction(board, col):
+                row = getNextOpenRow(board, col)
+                dropPiece(board, row, col, player)
+                if winningMove(board , player):
+                    label = myfont.render("Player 1 wins!!", 1, RED)
+                    screen.blit(label, (40, 10)) # Updates specific part of screen
+                    gameOver = True
+                
+                player = 2
+                
+                if not gameOver:
+                    boardCopy = copy.copy(board)
+                    move, minimax_score = miniMax(boardCopy, 3, True) # if miniMax(board, 5, True):
+                    if move is not None:
+                        row, col = move  # Unpack the move tuple into row and col
+                        # Apply the move to the game state
+                        board[row][col] = 2
+                        if winningMove(board, player):
+                            gameOver = True
+                        player = 1
+                
+                if not gameOver:
+                    if isBoardFull(board):
+                        gameOver = True
 
-                    if e.type == pygame.MOUSEMOTION:
-                        pygame.draw.rect(self.window, BLACK, (0, 0, WIDTH, SQUARE_SIZE))
-                        posx = e.pos[0]
-                        pygame.draw.circle(self.window, RED if self.turn == 0 else YELLOW, (posx, int(SQUARE_SIZE / 2)), RADIUS)
-                        pygame.display.update()
+        if e.type == pygame.KEYDOWN:
+            if e.key == pygame.K_r:
+                restartGame()
+                gameOver = False
+                player = 1
+    
+    if not gameOver:
+        # printBoard(board)
+        drawBoard(board)
+        pygame.display.update()
 
-                    if e.type == pygame.MOUSEBUTTONDOWN:
-                        pygame.draw.rect(self.window, BLACK, (0, 0, WIDTH, SQUARE_SIZE))
-                        posx = e.pos[0]
-                        if self.handlePlayerMove(1, posx):
-                            self.printBoard()
-                            self.drawBoard()
-                            self.turn = 1
-
-                            if self.gameOver:
-                                pygame.time.wait(5000)
-
-            # AI's turn
-            if self.turn == 1 and not self.gameOver:
-                col, minimax_score = self.minimax(self.board, 5, -math.inf, math.inf, True)
-                if self.handlePlayerMove(2, col * SQUARE_SIZE):
-                    self.printBoard()
-                    self.drawBoard()
-                    self.turn = 0
-
-                    if self.gameOver:
-                        pygame.time.wait(5000)
-
-        pygame.quit()
-
-if __name__ == "__main__":
-    game = ConnectFour()
-    game.runGame()
+    else:
+        pygame.time.wait(5000)
