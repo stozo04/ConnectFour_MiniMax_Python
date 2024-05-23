@@ -205,25 +205,24 @@ def scorePosition(board, player):
 
     return score
 
+def displayMessage(message, color):
+    label = playagainfont.render(message, 1, color)
+    screen.blit(label, (40, 40))
+    pygame.display.update()
 
-# def bestMove(board, depth, isMaximizing):
-#     bestScore = -math.inf
-#     bestMove  = (-1, -1)
-#     boardCopy = board
-#     for move in getAvailableMoves(boardCopy):
-#         row, col = move  # Unpack the move tuple into row and col
-#          # Apply the move to the game state
-#         boardCopy[row][col] = 2
-#         score = miniMax(boardCopy, depth, isMaximizing)
-#         if score > bestScore:
-#             bestScore = score
-#             bestMove = move
-
-#     if bestMove != (-1, -1):
-#         row, col = move  # Unpack the move tuple into row and col
-#         board[row][col] = move
-#         return True
-#     return False
+def askPlayAgain():
+    displayMessage("Play Again? (Y/N)", RED)
+    while True:
+        for e in pygame.event.get():
+            if e.type == pygame.QUIT:
+                pygame.display.quit()
+                pygame.quit()
+                return False
+            if e.type == pygame.KEYDOWN:
+                if e.key == pygame.K_y:
+                    return True
+                elif e.key == pygame.K_n:
+                    return False
 
 board = createBoard()
 printBoard(board)
@@ -236,6 +235,8 @@ drawBoard(board)
 pygame.display.update()
 
 myfont = pygame.font.SysFont("monospace", 75)
+playagainfont = pygame.font.SysFont("monospace", 55)
+aifont = pygame.font.SysFont("monospace", 25)
 
 while not gameOver:
     for e in pygame.event.get():
@@ -274,21 +275,23 @@ while not gameOver:
                         row, col = move
                         dropPiece(board, row, col, 2)
                         if winningMove(board, 2):
-                            label = myfont.render("Player 2 wins!!", 1, YELLOW)
+                            label = aifont.render("Player 2 wins!!", 1, YELLOW)
                             screen.blit(label, (40, 10))
+                            drawBoard(board)
+                            pygame.display.update()
                             gameOver = True
                         player = 1
 
                 if isBoardFull(board):
                     gameOver = True
 
-        if e.type == pygame.KEYDOWN:
-            if e.key == pygame.K_r:
-                board = restartGame(board)
-                gameOver = False
-                player = 1
-
     if not gameOver:
         drawBoard(board)
     else:
-        pygame.time.wait(3000)
+        if askPlayAgain():
+            gameOver = False
+            board = restartGame(board)
+            player = 1
+        else:
+            pygame.display.quit()
+            pygame.quit()
